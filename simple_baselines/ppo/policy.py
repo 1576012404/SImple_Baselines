@@ -56,6 +56,7 @@ class PolicyWithValue():
 def build_policy(env,policy_network,value_network=None,**policy_kargs):
     if isinstance(policy_network,str):
         network_type=policy_network
+        print("policy_kwargs", policy_kargs)
         policy_network=get_network_builder(network_type)(**policy_kargs)
 
     def policy_fn(nbatch=None,nsteps=None,sess=None,obs_placeholder=None):

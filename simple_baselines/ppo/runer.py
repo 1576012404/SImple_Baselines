@@ -1,5 +1,7 @@
 import numpy as np
 from abc import ABC, abstractmethod
+import random
+import math
 
 class AbstractEnvRunner(ABC):
     def __init__(self, *, env, model, nsteps):
@@ -18,22 +20,41 @@ class AbstractEnvRunner(ABC):
         raise NotImplementedError
 
 class Runner(AbstractEnvRunner):
-    def __init__(self,env,model,nsteps,gamma,lam):
-        super().__init__(env=env,model=model,nsteps=nsteps)
+    def __init__(self,env,model,nsteps,gamma,lam,epsilon_start=0.9,epsilon_final=0.002,epsilon_decay=140,):
+        super().__init__(env=env,model=model,nsteps=nsteps, )
         self.lam=lam
         self.gamma=gamma
+        self.epsilon_start=epsilon_start
+        self.epsilon_final=epsilon_final
+        self.epsilon_decay=epsilon_decay
 
-    def run(self):
+    def run(self,update):
         mb_obs,mb_actions,mb_rewards,mb_values,mb_dones,mb_neglogps=[],[],[],[],[],[]
         mb_states=self.states
+        if self.epsilon_start>0:
+            epsilon=self.epsilon_final+(self.epsilon_start-self.epsilon_final)*math.exp(-1*update/self.epsilon_decay)
+        else:
+            epsilon=0
 
         for i in range(self.nsteps):
             actions,values,self.states,neglogps=self.model.step(self.obs,S=self.states,M=self.dones)
+            # if i==4:
+            # 
+            #     print("###################")
+            #     print("values", values)
+            #     print("actions", actions)
+            #     print("done", self.dones)
             mb_obs.append(self.obs.copy())
             mb_actions.append(actions)
             mb_values.append(values)
             mb_neglogps.append(neglogps)
             mb_dones.append(self.dones)
+
+            if epsilon and random.random()<epsilon:
+                actions=[]
+                unwapped=self.env.unwrapped
+                for env in unwapped.envs:
+                    actions.append(env.action_space.sample())
 
             self.obs[:],rewards,self.dones,infos=self.env.step(actions)#step
             mb_rewards.append(rewards)

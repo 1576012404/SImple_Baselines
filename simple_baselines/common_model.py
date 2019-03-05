@@ -25,12 +25,6 @@ def mlp(num_layers=2,num_hidden=64,activation=tf.tanh,layer_norm=False):
     return network_fun
 
 
-
-
-
-
-
-
 def conv(x, scope, *, nf, rf, stride, pad='VALID', init_scale=1.0, data_format='NHWC', one_dim_bias=False):
     if data_format == 'NHWC':
         channel_ax = 3
@@ -93,7 +87,11 @@ def lstm(nlstm=128,layer_norm=False):
         ms=batch_to_seq(M,nenv,nsteps)
 
 
-        h5,snew=utils.lstm(xs,ms,S,scope="lstm",nh=nlstm)
+        if layer_norm:
+            h5, snew = utils.lnlstm(xs, ms, S, scope='lnlstm', nh=nlstm)
+        else:
+            h5, snew = utils.lstm(xs, ms, S, scope='lstm', nh=nlstm)
+
 
         h=seq_to_batch(h5)
 
@@ -103,7 +101,31 @@ def lstm(nlstm=128,layer_norm=False):
     return network_fn
 
 
+@register("cnn_lstm")
+def cnn_lstm(nlstm=128, layer_norm=False, **conv_kwargs):
+    def network_fn(X, nenv=1):
+        nbatch = X.shape[0]
+        nsteps = nbatch // nenv
 
+        h = nature_cnn(X, **conv_kwargs)
+
+        M = tf.placeholder(tf.float32, [nbatch]) #mask (done t-1)
+        S = tf.placeholder(tf.float32, [nenv, 2*nlstm]) #states
+
+        xs = batch_to_seq(h, nenv, nsteps)
+        ms = batch_to_seq(M, nenv, nsteps)
+
+        if layer_norm:
+            h5, snew = utils.lnlstm(xs, ms, S, scope='lnlstm', nh=nlstm)
+        else:
+            h5, snew = utils.lstm(xs, ms, S, scope='lstm', nh=nlstm)
+
+        h = seq_to_batch(h5)
+        initial_state = np.zeros(S.shape.as_list(), dtype=float)
+
+        return h, {'S':S, 'M':M, 'state':snew, 'initial_state':initial_state}
+
+    return network_fn
 
 
 

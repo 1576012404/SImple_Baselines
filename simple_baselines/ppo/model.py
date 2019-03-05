@@ -49,12 +49,15 @@ class Model():
         if max_grad_norm is not None:
             grads,_grad_norm=tf.clip_by_global_norm(grads,max_grad_norm)
         grads_and_var=list(zip(grads,var))
+        import copy
+        self.grads_and_var = grads_and_var
 
         self.grads=grads
         self.var=var
         self._train_op=self.trainer.apply_gradients(grads_and_var)
-        self.loss_name=["policy_loss","value_loss","policy_entropy","approxkl","clipfrac"]
-        self.stats_list=[pg_loss,vf_loss,entropy,approxkl,clipfrac]
+
+        self.loss_name=["all_loss","policy_loss","value_loss","policy_entropy","approxkl","clipfrac"]
+        self.stats_list=[loss,pg_loss,vf_loss,entropy,approxkl,clipfrac]
 
         self.train_model=train_model
         self.act_model=act_model
@@ -67,7 +70,16 @@ class Model():
 
         initialize()
 
+        global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="")
+
+        # init_para = tf.trainable_variables('ppo_model')
+        # for var in init_para:
+        #     real_val = self.sess.run(var)
+        #     print("init_para", var.name,real_val)
+
+
     def train(self,lr,cliprange,obs,returns,masks,actions,values,neglogps,states=None):
+
 
         advs=returns-values
 
@@ -86,6 +98,11 @@ class Model():
         if states is not None:
             td_map[self.train_model.S]=states
             td_map[self.train_model.M]=masks
+
+        # real_val=self.sess.run(self.grads_and_var,feed_dict=td_map)
+        # for i in range(len(real_val)):
+        #     print("name",self.grads_and_var[i][1].name,real_val[i][0])
+
         return self.sess.run(
             self.stats_list+[self._train_op],td_map
         )[:-1]
